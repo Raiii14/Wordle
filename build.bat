@@ -1,8 +1,9 @@
 @ECHO OFF
 TASM mainModu\wordle.asm || GOTO :error
 TASM services\drawbox.asm || GOTO :error
+TASM services\getchar.asm || GOTO :error
 
-TLINK wordle.obj+drawbox.obj || GOTO :error
+TLINK wordle.obj+drawbox.obj+getchar.obj || GOTO :error
 wordle || GOTO :error
 
 GOTO :end

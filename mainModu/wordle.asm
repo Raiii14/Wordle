@@ -9,6 +9,9 @@ DOS_INT        EQU 21H
 
 ; external procedure that draws all boxes
 EXTRN DrawBoxes:NEAR
+; external procedures for input
+EXTRN GetInput:NEAR
+EXTRN GetExactly5:NEAR
 
 ; -------------------------------------------------------
 ; flow summary (current build)
@@ -39,10 +42,10 @@ main PROC
     ; draw all boxes (separate module)
     CALL DrawBoxes
     
+    ; after drawing, read exactly 5 characters (no echo, retains partial input)
+    CALL GetExactly5         ; blocks until 5 chars collected
+    
     ; program exit
-    ; wait for a keystroke to keep the image visible
-    MOV AH, 00H
-    INT 16H            ; Waits for any key press
 
     ; restore original video mode
     MOV AH, 00H        ; Set Video Mode

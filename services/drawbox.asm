@@ -3,13 +3,14 @@
 
 .MODEL SMALL
 
+; instead of using .DATA, we used fixed constants, like in Java which is 'final'
 ; box settings
-BOX_WIDTH  EQU 75
+BOX_WIDTH  EQU 75       ; Box width equals 75, immediate address
 BOX_HEIGHT EQU 70
 BOX_GAP    EQU 15
 START_X    EQU 100
 START_Y    EQU 65
-BOX_COLOR  EQU 0Eh    ; yellow/high-intensity
+BOX_COLOR  EQU 0Eh      ; yellow/high-intensity
 
 .CODE
 PUBLIC DrawBoxes
