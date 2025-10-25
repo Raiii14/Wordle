@@ -5,27 +5,8 @@
 ; buffered input for up to 5 characters + carriage return
 word DB 05, ?, 06 DUP(?)
 
+
 .CODE
-PUBLIC GetInput
-GetInput PROC NEAR
-	; expects: DS already set by caller
-	; returns:
-	;   AL = length typed (0..5)
-	;   CX = length typed (0..5)
-	;   SI = pointer to first character (word+2)
-	;   buffer layout: [word+0]=max, [word+1]=len, [word+2..]=chars, [word+2+len]=0Dh
-
-	LEA DX, word       ; dx -> input buffer
-	MOV AH, 0Ah        ; DOS buffered input
-	INT 21h
-
-	MOV AL, [word+1]   ; al = length typed
-	XOR AH, AH         ; ax = length
-	MOV CX, AX         ; cx = length
-	LEA SI, word+2     ; si -> first character
-
-	RET
-GetInput ENDP
 
 ; blocks until exactly 5 characters are entered; retains what was typed if enter is pressed early
 ; returns:
@@ -33,24 +14,42 @@ GetInput ENDP
 ;   CX = length (5)
 ;   SI = the pointer to first character (word+2)
 
+
 PUBLIC GetExactly5
 GetExactly5 PROC NEAR
 	LEA SI, word+2     ; si -> first character position
 	XOR BX, BX         ; bl = length (0..5)
 
+    ; Similar to = while(true)
     ReadLoop:
         ; wait for a keystroke (blocking)
-        XOR AH, AH         ; ah=00h read key
+        MOV AH, 00h         ; ah=00h read key
         INT 16h            ; al=ascii (if any), ah=scancode
+
+        ; ================================================================
+
+        ; - if(KeyPressed == Enter && i == 5)
+        ; - Which means that there are already 5 characters entered
 
         CMP AL, 0Dh        ; enter?
         JE  OnEnter
 
-        CMP AL, 08h        ; backspace?
+
+        ; - else if(KeyPressed != Backspace)
+        ; - This is the function that stores each character in the buffer
+        
+        CMP AL, 08h         ; backspace?
         JNE NotBackspace
 
+
+        ; - Checks if the length of the input is at 0
+        ; - If equal (JE), goes back to the beginning of the loop
         CMP BL, 0
-        JE  ReadLoop       ; nothing to delete
+        JE  ReadLoop        ; nothing to delete
+
+        ; - If not equal, it will erase the last character on the screen
+        ; - Think of the instructions below as else {}
+        ; ================================================================
 
         ; update buffer (remove last char)
         DEC BL
@@ -59,24 +58,25 @@ GetExactly5 PROC NEAR
         PUSH AX
         PUSH BX
 
-        MOV AH, 0Eh        ; teletype output
-        MOV BH, 0          ; page 0
-        MOV BL, 0Fh        ; color (bright white)
-        MOV AL, 08h        ; backspace
+        MOV AH, 0Eh         ; teletype output int 10h - can also work great in graphics mode of getting inputs
+        MOV BH, 0           ; page 0
+        MOV BL, 0Fh         ; color (bright white)
+        MOV AL, 08h         ; backspace
         INT 10h
 
-        MOV AL, 20h        ; space
+        MOV AL, 20h         ; space
         INT 10h
-        MOV AL, 08h        ; backspace
+        MOV AL, 08h         ; backspace
         INT 10h
         POP BX
         POP AX
-        JMP ReadLoop
+        JMP ReadLoop        ; goes back to the beginning of the loop after erasing the last echoed character
 
-    ; The label for actually storing each character
+
+    ; The label/loop for actually storing each character
     NotBackspace:
         CMP BL, 5
-        JAE ReadLoop       ; already at max, ignore extra chars
+        JAE ReadLoop        ; already at max, ignore extra chars
         ; store character
         MOV [SI], AL
         INC SI
@@ -94,7 +94,7 @@ GetExactly5 PROC NEAR
 
     OnEnter:
         CMP BL, 5
-        JNE ReadLoop       ; not enough, keep buffer and continue reading
+        JNE ReadLoop       ; not enough characters, keep buffer and go back to the starting loop
 
         ; finalize buffer per DOS 0Ah layout for compatibility
         MOV [word+1], BL       ; actual length

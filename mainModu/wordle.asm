@@ -10,7 +10,6 @@ DOS_INT        EQU 21H
 ; external procedure that draws all boxes
 EXTRN DrawBoxes:NEAR
 ; external procedures for input
-EXTRN GetInput:NEAR
 EXTRN GetExactly5:NEAR
 
 ; -------------------------------------------------------
