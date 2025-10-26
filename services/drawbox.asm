@@ -5,12 +5,12 @@
 
 ; instead of using .DATA, we used fixed constants, like in Java which is 'final'
 ; box settings
-BOX_WIDTH  EQU 75       ; Box width equals 75, immediate address
-BOX_HEIGHT EQU 70
-BOX_GAP    EQU 15
-START_X    EQU 100
-START_Y    EQU 65
-BOX_COLOR  EQU 0Eh      ; yellow/high-intensity, to change the intensity, change the 4 bits, instead of 2 bits only
+BOX_WIDTH  EQU 50       ; Box width equals 50, immediate address
+BOX_HEIGHT EQU 50
+BOX_GAP    EQU 10
+START_X    EQU 169
+START_Y    EQU 46
+BOX_COLOR  EQU 0Fh      ; yellow/high-intensity, to change the intensity, change the 4 bits, instead of 2 bits only
 
 .CODE
 PUBLIC DrawBoxes

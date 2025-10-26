@@ -27,8 +27,8 @@ GetExactly5 PROC NEAR
     PUSH DX
     MOV AH, 02h
     MOV BH, 0          ; video page 0
-    MOV DH, 6          ; row
-    MOV DL, 17         ; col
+    MOV DH, 4          ; row
+    MOV DL, 24         ; col
     INT 10h
     POP DX
     POP BX
