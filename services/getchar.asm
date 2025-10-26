@@ -20,6 +20,20 @@ GetExactly5 PROC NEAR
 	LEA SI, word+2     ; si -> first character position
 	XOR BX, BX         ; bl = length (0..5)
 
+    ; set starting cursor for graphics teletype to pixel (115,80)
+    ; col = 115/8 = 14, row = 80/16 = 5
+    PUSH AX
+    PUSH BX
+    PUSH DX
+    MOV AH, 02h
+    MOV BH, 0          ; video page 0
+    MOV DH, 6          ; row
+    MOV DL, 17         ; col
+    INT 10h
+    POP DX
+    POP BX
+    POP AX
+
     ; Similar to = while(true)
     ReadLoop:
         ; wait for a keystroke (blocking)
@@ -32,7 +46,13 @@ GetExactly5 PROC NEAR
         ; - Which means that there are already 5 characters entered
 
         CMP AL, 0Dh        ; enter?
-        JE  OnEnter
+        JE  OnEnter        ; keep format; trampoline right below
+        JMP AfterEnterCheck
+
+    OnEnter:
+        JMP OnEnter_real   ; near jump to real handler (fixes out-of-range)
+
+    AfterEnterCheck:
 
 
         ; - else if(KeyPressed != Backspace)
@@ -54,16 +74,14 @@ GetExactly5 PROC NEAR
         ; update buffer (remove last char)
         DEC BL
         DEC SI
-        ; visually erase last echoed char: BS, space, BS
+        ; visually erase last echoed char: BS, space, BS (teletype)
         PUSH AX
         PUSH BX
-
-        MOV AH, 0Eh         ; teletype output int 10h - can also work great in graphics mode of getting inputs
+        MOV AH, 0Eh         ; teletype output
         MOV BH, 0           ; page 0
-        MOV BL, 0Fh         ; color (bright white)
+        MOV BL, 0Fh         ; bright white
         MOV AL, 08h         ; backspace
         INT 10h
-
         MOV AL, 20h         ; space
         INT 10h
         MOV AL, 08h         ; backspace
@@ -76,25 +94,31 @@ GetExactly5 PROC NEAR
     ; The label/loop for actually storing each character
     NotBackspace:
         CMP BL, 5
-        JAE ReadLoop        ; already at max, ignore extra chars
+        JB  DoStore         ; short jump if below max
+        JMP ReadLoop        ; already at max, ignore extra chars
+    DoStore:
         ; store character
         MOV [SI], AL
         INC SI
         INC BL
-        ; echo character using BIOS teletype (works in graphics mode)
-        PUSH AX
-        PUSH BX
-        MOV AH, 0Eh        ; teletype output
-        MOV BH, 0          ; page 0
-        MOV BL, 0Fh        ; bright white
-        INT 10h            ; prints AL in current mode
-        POP BX             ; restore BL=length and BH
-        POP AX
+    ; echo character using BIOS teletype (continue from current cursor)
+    PUSH AX
+    PUSH BX
+    MOV AH, 0Eh        ; teletype output
+    MOV BH, 0          ; page 0
+    MOV BL, 0Fh        ; bright white
+    MOV AL, [SI-1]
+    INT 10h            ; prints AL in current mode
+    POP BX             ; restore BL=length and BH
+    POP AX
         JMP ReadLoop
 
-    OnEnter:
+    OnEnter_real:
         CMP BL, 5
-        JNE ReadLoop       ; not enough characters, keep buffer and go back to the starting loop
+        JE  HaveFive
+        JMP ReadLoop       ; not enough characters, keep buffer and go back to the starting loop
+
+    HaveFive:
 
         ; finalize buffer per DOS 0Ah layout for compatibility
         MOV [word+1], BL       ; actual length
