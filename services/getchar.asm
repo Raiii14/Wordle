@@ -3,7 +3,12 @@
 .DATA
 
 ; buffered input for up to 5 characters + carriage return
-word DB 05, ?, 06 DUP(?)
+input1 DB 05, ?, 06 DUP(?)
+; center column per box (text grid cols), for 5 boxes left -> right
+; computed from START_X=169, BOX_WIDTH=54, BOX_GAP=10
+; result: 24, 32, 40, 48, 56 (increments by 8)
+colTable DB 24, 32, 40, 48, 56
+ROW_CENTER EQU 4
 
 
 .CODE
@@ -12,12 +17,12 @@ word DB 05, ?, 06 DUP(?)
 ; returns:
 ;   AL = length (always 5 on return)
 ;   CX = length (5)
-;   SI = the pointer to first character (word+2)
+;   SI = the pointer to first character (input1+2)
 
 
 PUBLIC GetExactly5
 GetExactly5 PROC NEAR
-	LEA SI, word+2     ; si -> first character position
+	LEA SI, input1+2     ; si -> first character position in the buffer
 	XOR BX, BX         ; bl = length (0..5)
 
     ; set starting cursor for graphics teletype to pixel (115,80)
@@ -28,7 +33,7 @@ GetExactly5 PROC NEAR
     MOV AH, 02h
     MOV BH, 0          ; video page 0
     MOV DH, 4          ; row
-    MOV DL, 24         ; col
+    MOV DL, 32         ; col
     INT 10h
     POP DX
     POP BX
@@ -74,20 +79,37 @@ GetExactly5 PROC NEAR
         ; update buffer (remove last char)
         DEC BL
         DEC SI
-        ; visually erase last echoed char: BS, space, BS (teletype)
-        PUSH AX
-        PUSH BX
-        MOV AH, 0Eh         ; teletype output
-        MOV BH, 0           ; page 0
-        MOV BL, 0Fh         ; bright white
-        MOV AL, 08h         ; backspace
-        INT 10h
-        MOV AL, 20h         ; space
-        INT 10h
-        MOV AL, 08h         ; backspace
-        INT 10h
-        POP BX
-        POP AX
+    ; visually erase the removed char at its box center
+    ; move cursor to row=4 (center row), col from table by index BL
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    PUSH SI
+    PUSH DI
+    MOV AH, 02h         ; set cursor
+    MOV BH, 0           ; page 0
+    MOV DH, 4           ; center row (precomputed)
+    MOV DI, OFFSET colTable
+    XOR CH, CH
+    MOV CL, BL          ; index = BL (0..4)
+    ADD DI, CX
+    MOV DL, [DI]        ; DL = col
+    INT 10h
+    ; print same removed char in black to overwrite pixels
+    MOV AH, 0Eh         ; teletype output
+    MOV BH, 0
+    PUSH BX             ; save BL=len
+    XOR BL, BL          ; BL=0 (black)
+    MOV AL, [SI]        ; removed character
+    INT 10h
+    POP BX
+    POP DI
+    POP SI
+    POP DX
+    POP CX
+    POP BX
+    POP AX
         JMP ReadLoop        ; goes back to the beginning of the loop after erasing the last echoed character
 
 
@@ -115,15 +137,37 @@ GetExactly5 PROC NEAR
         MOV [SI], AL
         INC SI
         INC BL
-    ; echo character using BIOS teletype (continue from current cursor)
+    ; echo the character centered in its box using the table
     PUSH AX
     PUSH BX
-    MOV AH, 0Eh        ; teletype output
-    MOV BH, 0          ; page 0
-    MOV BL, 0Fh        ; bright white
+    PUSH CX
+    PUSH DX
+    PUSH SI
+    PUSH DI
+    ; idx = BL-1 (0..4)
+    MOV CL, BL
+    DEC CL
+    MOV DI, OFFSET colTable
+    XOR CH, CH
+    ADD DI, CX
+    MOV DL, [DI]       ; DL = center col for this box
+    MOV DH, 4          ; row = 4 (center row)
+    MOV AH, 02h        ; set cursor
+    MOV BH, 0
+    INT 10h
+    ; draw the character in bright white
+    MOV AH, 0Eh
+    MOV BH, 0
+    PUSH BX            ; preserve BL=len
+    MOV BL, 0Fh
     MOV AL, [SI-1]
-    INT 10h            ; prints AL in current mode
-    POP BX             ; restore BL=length and BH
+    INT 10h
+    POP BX
+    POP DI
+    POP SI
+    POP DX
+    POP CX
+    POP BX
     POP AX
         JMP ReadLoop
 
@@ -135,8 +179,8 @@ GetExactly5 PROC NEAR
     HaveFive:
 
         ; finalize buffer per DOS 0Ah layout for compatibility
-        MOV [word+1], BL       ; actual length
-        MOV BYTE PTR [word+2+5], 0Dh   ; terminating CR
+        MOV [input1+1], BL       ; actual length
+        MOV BYTE PTR [input1+2+5], 0Dh   ; terminating CR
 
         ; optionally move to next line for readability
         PUSH AX
@@ -154,7 +198,7 @@ GetExactly5 PROC NEAR
         MOV AL, BL
         XOR AH, AH
         MOV CX, AX             ; cx = 5
-        LEA SI, word+2         ; si -> first character
+        LEA SI, input1+2         ; si -> first character
         RET
 GetExactly5 ENDP
 
