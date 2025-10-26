@@ -5,12 +5,25 @@
 
 ; instead of using .DATA, we used fixed constants, like in Java which is 'final'
 ; box settings
-BOX_WIDTH  EQU 54       ; Box width equals 50, immediate address
+BOX_WIDTH  EQU 54       ; Box width equals 54, immediate address
 BOX_HEIGHT EQU 50
 BOX_GAP    EQU 10
 START_X    EQU 169
 START_Y    EQU 46
 BOX_COLOR  EQU 0Fh      ; white/high-intensity, to change the intensity, change the 4 bits, instead of 2 bits only
+
+; -------------------------------------------------------
+; flow summary (current build)
+; - called after main switches to VGA mode 12h
+; - repeat 5 times (i = 0..4):
+;   - compute right (DI) and bottom (BP) edges from START_X/START_Y and BOX_WIDTH/BOX_HEIGHT
+;   - draw top line (left → right)
+;   - draw bottom line (left → right)
+;   - draw left line (top → bottom)
+;   - draw right line (top → bottom)
+;   - move to next box by adding (BOX_WIDTH + BOX_GAP) to SI (x position)
+; - return to caller
+; -------------------------------------------------------
 
 .CODE
 PUBLIC DrawBoxes
@@ -25,7 +38,7 @@ DrawBoxes PROC NEAR
         MOV DI, START_Y
 
     ; The starting loop for drawing the boxes, like the for loop
-    ; for (int i = 0; i > 5; i++) - which means this will print a box 5 times
+    ; for (int i = 0; i < 5; i++) - which means this will print a box 5 times
     OUTER_BOX_LOOP:
         MOV DI, START_Y
 

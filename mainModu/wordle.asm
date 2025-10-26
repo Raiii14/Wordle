@@ -41,7 +41,7 @@ main PROC
     ; draw all boxes (separate module)
     CALL DrawBoxes
     
-    ; after drawing, read exactly 5 characters (no echo, retains partial input)
+    ; after drawing, read exactly 5 characters (echoed and retains partial input until entered)
     CALL GetExactly5         ; blocks until 5 chars collected
     
     ; program exit

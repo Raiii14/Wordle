@@ -4,6 +4,7 @@
 
 ; buffered input for up to 5 characters + carriage return
 input1 DB 05, ?, 06 DUP(?)
+
 ; center column per box (text grid cols), for 5 boxes left -> right
 ; computed from START_X=169, BOX_WIDTH=54, BOX_GAP=10
 ; result: 24, 32, 40, 48, 56 (increments by 8)
@@ -12,6 +13,25 @@ ROW_CENTER EQU 4
 
 
 .CODE
+
+; -------------------------------------------------------
+; flow summary (current build)
+; - si points to the input buffer; bl holds current length (0..5)
+; - loop:
+;   - read a key (INT 16h)
+;   - if Enter:
+;       - if bl == 5 → finalize buffer (DOS 0Ah layout), print CR/LF, return
+;       - else → keep waiting for more input
+;   - else if Backspace and bl > 0:
+;       - decrement bl and si; move cursor to row 4 and center column for that index
+;       - print the removed character in black to visually erase it
+;   - else if key is a letter:
+;       - convert lowercase to uppercase; if bl < 5 store it (buffer[si] = AL)
+;       - increment bl; move cursor to row 4 and center column for (bl-1)
+;       - print the character in bright white
+;   - else:
+;       - ignore the key and read again
+; -------------------------------------------------------
 
 ; blocks until exactly 5 characters are entered; retains what was typed if enter is pressed early
 ; returns:
@@ -25,20 +45,6 @@ GetExactly5 PROC NEAR
 	LEA SI, input1+2     ; si -> first character position in the buffer
 	XOR BX, BX         ; bl = length (0..5)
 
-    ; set starting cursor for graphics teletype to pixel (115,80)
-    ; col = 115/8 = 14, row = 80/16 = 5
-    PUSH AX
-    PUSH BX
-    PUSH DX
-    MOV AH, 02h
-    MOV BH, 0          ; video page 0
-    MOV DH, 4          ; row
-    MOV DL, 32         ; col
-    INT 10h
-    POP DX
-    POP BX
-    POP AX
-
     ; Similar to = while(true)
     ReadLoop:
         ; wait for a keystroke (blocking)
@@ -51,15 +57,13 @@ GetExactly5 PROC NEAR
         ; - Which means that there are already 5 characters entered
 
         CMP AL, 0Dh        ; enter?
-        JE  OnEnter        ; keep format; trampoline right below
+        JE  OnEnter        ; to prevent jump out of range (limit of +-127), make a function that JMPs to the real function
         JMP AfterEnterCheck
 
     OnEnter:
         JMP OnEnter_real   ; near jump to real handler (fixes out-of-range)
 
     AfterEnterCheck:
-
-
         ; - else if(KeyPressed != Backspace)
         ; - This is the function that stores each character in the buffer
         
@@ -79,44 +83,50 @@ GetExactly5 PROC NEAR
         ; update buffer (remove last char)
         DEC BL
         DEC SI
-    ; visually erase the removed char at its box center
-    ; move cursor to row=4 (center row), col from table by index BL
-    PUSH AX
-    PUSH BX
-    PUSH CX
-    PUSH DX
-    PUSH SI
-    PUSH DI
-    MOV AH, 02h         ; set cursor
-    MOV BH, 0           ; page 0
-    MOV DH, 4           ; center row (precomputed)
-    MOV DI, OFFSET colTable
-    XOR CH, CH
-    MOV CL, BL          ; index = BL (0..4)
-    ADD DI, CX
-    MOV DL, [DI]        ; DL = col
-    INT 10h
-    ; print same removed char in black to overwrite pixels
-    MOV AH, 0Eh         ; teletype output
-    MOV BH, 0
-    PUSH BX             ; save BL=len
-    XOR BL, BL          ; BL=0 (black)
-    MOV AL, [SI]        ; removed character
-    INT 10h
-    POP BX
-    POP DI
-    POP SI
-    POP DX
-    POP CX
-    POP BX
-    POP AX
+
+        ; visually erase the removed char at its box center
+        ; move cursor to row=4 (center row), col from table by index BL
+        ; The push and pop in the stacks are used because we don't want to overwrite what's stored in those registers
+        ; So we save those values first, then use the registers for setting the values we need, then restore the previous values
+        PUSH AX
+        PUSH BX
+        PUSH CX
+        PUSH DX
+        PUSH SI
+        PUSH DI
+        ; =====================================================
+        MOV AH, 02h         ; set cursor
+        MOV BH, 0           ; page 0
+        MOV DH, 4           ; center row (precomputed)
+        MOV DI, OFFSET colTable
+        XOR CH, CH
+        MOV CL, BL          ; index = BL (0..4)
+        ADD DI, CX
+        MOV DL, [DI]        ; DL = col
+        INT 10h
+
+        ; print same removed char in black to overwrite pixels
+        MOV AH, 0Eh         ; teletype output
+        MOV BH, 0
+        PUSH BX             ; save BL=len
+        XOR BL, BL          ; BL=0 (black)
+        MOV AL, [SI]        ; removed character
+        INT 10h
+        ; ======================================================
+        POP BX
+        POP DI
+        POP SI
+        POP DX
+        POP CX
+        POP BX
+        POP AX
         JMP ReadLoop        ; goes back to the beginning of the loop after erasing the last echoed character
 
 
     ; The label/loop for actually storing each character
     NotBackspace:
-        ; accept letters only; force lowercase to uppercase
-        ; if AL in 'A'..'Z' keep; if in 'a'..'z' convert; else ignore
+        ; accept letters only, and converts lowercase to uppercase
+        ; if AL in 'A'..'Z' keep it. if in 'a'..'z' convert to upper case. else ignore
         CMP AL, 'A'
         JB  NotLetter
         CMP AL, 'Z'
@@ -126,24 +136,27 @@ GetExactly5 PROC NEAR
         CMP AL, 'z'
         JA  NotLetter
         AND AL, 0DFh            ; make uppercase
-    LetterOK:
-        CMP BL, 5
-        JB  DoStore         ; short jump if below max
-        JMP ReadLoop        ; already at max, ignore extra chars
-    NotLetter:
-        JMP ReadLoop        ; ignore non-letters
-    DoStore:
-        ; store character
-        MOV [SI], AL
-        INC SI
-        INC BL
+        LetterOK:
+            CMP BL, 5
+            JB  DoStore         ; short jump if below max
+            JMP ReadLoop        ; already at max, ignore extra chars
+        NotLetter:
+            JMP ReadLoop        ; ignore non-letters
+        DoStore:
+            ; stores the character in the buffer (like putting a character in an array position)
+            MOV [SI], AL
+            INC SI
+            INC BL
+        
     ; echo the character centered in its box using the table
+    ; so we save and restore registers to the stack, to avoid overwriting values
     PUSH AX
     PUSH BX
     PUSH CX
     PUSH DX
     PUSH SI
     PUSH DI
+    ; =====================================================
     ; idx = BL-1 (0..4)
     MOV CL, BL
     DEC CL
@@ -162,6 +175,7 @@ GetExactly5 PROC NEAR
     MOV BL, 0Fh
     MOV AL, [SI-1]
     INT 10h
+    ; =====================================================
     POP BX
     POP DI
     POP SI
@@ -173,10 +187,10 @@ GetExactly5 PROC NEAR
 
     OnEnter_real:
         CMP BL, 5
-        JE  HaveFive
+        JE  HaveFiveChars       ; 
         JMP ReadLoop       ; not enough characters, keep buffer and go back to the starting loop
 
-    HaveFive:
+    HaveFiveChars:
 
         ; finalize buffer per DOS 0Ah layout for compatibility
         MOV [input1+1], BL       ; actual length
