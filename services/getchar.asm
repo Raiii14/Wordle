@@ -93,9 +93,23 @@ GetExactly5 PROC NEAR
 
     ; The label/loop for actually storing each character
     NotBackspace:
+        ; accept letters only; force lowercase to uppercase
+        ; if AL in 'A'..'Z' keep; if in 'a'..'z' convert; else ignore
+        CMP AL, 'A'
+        JB  NotLetter
+        CMP AL, 'Z'
+        JBE LetterOK
+        CMP AL, 'a'
+        JB  NotLetter
+        CMP AL, 'z'
+        JA  NotLetter
+        AND AL, 0DFh            ; make uppercase
+    LetterOK:
         CMP BL, 5
         JB  DoStore         ; short jump if below max
         JMP ReadLoop        ; already at max, ignore extra chars
+    NotLetter:
+        JMP ReadLoop        ; ignore non-letters
     DoStore:
         ; store character
         MOV [SI], AL
