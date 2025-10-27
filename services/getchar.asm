@@ -9,7 +9,8 @@ input1 DB 05, ?, 06 DUP(?)
 ; computed from START_X=169, BOX_WIDTH=54, BOX_GAP=10
 ; result: 24, 32, 40, 48, 56 (increments by 8)
 colTable DB 24, 32, 40, 48, 56
-ROW_CENTER EQU 4
+; active text-row to echo into (top of 8x16 cell). 4 = first row center, 7 = second row center
+RowCenter DB 4
 
 
 .CODE
@@ -97,7 +98,7 @@ GetExactly5 PROC NEAR
         ; =====================================================
         MOV AH, 02h         ; set cursor
         MOV BH, 0           ; page 0
-        MOV DH, 4           ; center row (precomputed)
+    MOV DH, [RowCenter] ; center row (selectable)
         MOV DI, OFFSET colTable
         XOR CH, CH
         MOV CL, BL          ; index = BL (0..4)
@@ -164,7 +165,7 @@ GetExactly5 PROC NEAR
     XOR CH, CH
     ADD DI, CX
     MOV DL, [DI]       ; DL = center col for this box
-    MOV DH, 4          ; row = 4 (center row)
+    MOV DH, [RowCenter]     ; active center row
     MOV AH, 02h        ; set cursor
     MOV BH, 0
     INT 10h
@@ -215,5 +216,17 @@ GetExactly5 PROC NEAR
         LEA SI, input1+2         ; si -> first character
         RET
 GetExactly5 ENDP
+
+; -------------------------------------------------------
+; SetEchoRow
+; - sets which text-row (DH) the echo/erase uses
+; - usage: AL = row index (e.g., 4 for first row center, 7 for second row center)
+; - example: SetEchoRow(7) in Java style
+; -------------------------------------------------------
+PUBLIC SetEchoRow
+SetEchoRow PROC NEAR
+    MOV [RowCenter], AL
+    RET
+SetEchoRow ENDP
 
 END

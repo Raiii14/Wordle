@@ -11,6 +11,7 @@ DOS_INT        EQU 21H
 EXTRN DrawBoxes:NEAR
 ; external procedures for input
 EXTRN GetExactly5:NEAR
+EXTRN SetEchoRow:NEAR
 
 ; -------------------------------------------------------
 ; flow summary (current build)
@@ -41,8 +42,12 @@ main PROC
     ; draw all boxes (separate module)
     CALL DrawBoxes
     
-    ; after drawing, read exactly 5 characters (echoed and retains partial input until entered)
-    CALL GetExactly5         ; blocks until 5 chars collected
+    ; after drawing, read exactly 5 characters on the first row
+    CALL GetExactly5         ; blocks until 5 chars collected (row center = 4)
+    ; switch echo to second row center (row index 7), then read next 5 characters
+    MOV AL, 8                ; 7 ~= vertical center of second row (8x16 cell grid)
+    CALL SetEchoRow
+    CALL GetExactly5         ; second row input
     
     ; program exit
 
