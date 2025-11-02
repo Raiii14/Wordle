@@ -1,3 +1,4 @@
+
 .MODEL SMALL
 
 .STACK 64
@@ -16,8 +17,9 @@ EXTRN SetEchoRow:NEAR
 ; -------------------------------------------------------
 ; flow summary (current build)
 ; - switch to graphics mode
-; - call drawboxes (draws one row of 5 boxes)
-; - wait for key, restore mode, exit
+; - call drawboxes (draws 6 rows of 5 boxes each)
+; - collect input for each row sequentially (rows 1-6)
+; - restore mode, exit
 ; -------------------------------------------------------
 
 .DATA
@@ -42,12 +44,35 @@ main PROC
     ; draw all boxes (separate module)
     CALL DrawBoxes
     
-    ; after drawing, read exactly 5 characters on the first row
-    CALL GetExactly5         ; blocks until 5 chars collected (row center = 4)
-    ; switch echo to second row center (row index 7), then read next 5 characters
-    MOV AL, 8                ; 7 ~= vertical center of second row (8x16 cell grid)
+    ; Row 1 input (text row 4) -
+    MOV AL, 4
     CALL SetEchoRow
-    CALL GetExactly5         ; second row input
+    CALL GetExactly5
+    
+    ; Row 2 input (text row 8)   
+    MOV AL, 8
+    CALL SetEchoRow
+    CALL GetExactly5
+    
+    ; Row 3 input (text row 12)
+    MOV AL, 12
+    CALL SetEchoRow
+    CALL GetExactly5
+    
+    ; Row 4 input (text row 16) 
+    MOV AL, 16
+    CALL SetEchoRow
+    CALL GetExactly5
+    
+    ; Row 5 input (text row 20) 
+    MOV AL, 20
+    CALL SetEchoRow
+    CALL GetExactly5
+    
+    ; Row 6 input (text row 24) 
+    MOV AL, 24
+    CALL SetEchoRow
+    CALL GetExactly5
     
     ; program exit
 

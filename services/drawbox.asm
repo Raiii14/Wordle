@@ -1,3 +1,4 @@
+
 ; draws a row of 5 boxes in mode 12h (640x480x16)
 ; 8.3 filename alias for dos/tasm convenience
 
@@ -6,25 +7,25 @@
 ; instead of using .DATA, we used fixed constants, like in Java which is 'final'
 ; box settings
 BOX_WIDTH  EQU 54       ; Box width equals 54, immediate address
-BOX_HEIGHT EQU 52
+BOX_HEIGHT EQU 48       ; Reduced from 52 to 48 for better text alignment
 BOX_GAP    EQU 10
 START_X    EQU 169
 START_Y    EQU 46
 BOX_COLOR  EQU 0Fh      ; white/high-intensity, to change the intensity, change the 4 bits, instead of 2 bits only
 
 ; vertical spacing between rows
-ROW_GAP    EQU 10
+ROW_GAP    EQU 16       ; Increased from 10 to 16 for text grid alignment
 
 ; small data to support drawing multiple rows cleanly
 .DATA
 YBASE      DW 0         ; current row's top Y (in pixels)
-ROWS_LEFT  DB 0         ; how many rows to draw (we'll set to 2)
+ROWS_LEFT  DB 0         ; how many rows to draw (we'll set to 6)
 
 ; -------------------------------------------------------
 ; flow summary (current build)
 ; - called after main switches to VGA mode 12h
-; - draw 2 rows total; for each row:
-;   - set YBASE to row's top (first row = START_Y; second row = START_Y + BOX_HEIGHT + ROW_GAP)
+; - draw 6 rows total; for each row:
+;   - set YBASE to row's top Y position using formula: START_Y + row_index * (BOX_HEIGHT + ROW_GAP)
 ;   - repeat 5 times (i = 0..4):
 ;   - compute right (DI) and bottom (BP) edges from START_X/START_Y and BOX_WIDTH/BOX_HEIGHT
 ;   - draw top line (left → right)
@@ -43,18 +44,18 @@ DrawBoxes PROC NEAR
         MOV BYTE PTR [ROWS_LEFT], 6
 
 ROW_START:
-        ; set YBASE depending on which row we're on
+        ; set YBASE based on which row we're on (0-5, where 0 is top row)
         MOV AL, [ROWS_LEFT]
-        CMP AL, 2
-        JNE SECOND_ROW
-FIRST_ROW:
-        MOV AX, START_Y
-        MOV [YBASE], AX
-        JMP ROW_SETUP_DONE
-SECOND_ROW:
-        MOV AX, START_Y
-        ADD AX, BOX_HEIGHT
-        ADD AX, ROW_GAP
+        MOV AH, 6               ; total rows
+        SUB AH, AL              ; AH = current row index (0-5)
+        
+        ; Calculate Y position: START_Y + row_index * (BOX_HEIGHT + ROW_GAP)
+        MOV AL, AH              ; AL = row index
+        XOR AH, AH              ; AX = row index
+        MOV BX, BOX_HEIGHT
+        ADD BX, ROW_GAP         ; BX = BOX_HEIGHT + ROW_GAP
+        MUL BX                  ; AX = row_index * (BOX_HEIGHT + ROW_GAP)
+        ADD AX, START_Y         ; AX = START_Y + row_offset
         MOV [YBASE], AX
 ROW_SETUP_DONE:
 

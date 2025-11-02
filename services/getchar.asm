@@ -1,3 +1,4 @@
+
 .MODEL SMALL
 
 .DATA
@@ -9,7 +10,7 @@ input1 DB 05, ?, 06 DUP(?)
 ; computed from START_X=169, BOX_WIDTH=54, BOX_GAP=10
 ; result: 24, 32, 40, 48, 56 (increments by 8)
 colTable DB 24, 32, 40, 48, 56
-; active text-row to echo into (top of 8x16 cell). 4 = first row center, 7 = second row center
+; active text-row to echo into (top of 8x16 cell). 4 = first row center, 8 = second row center, etc.
 RowCenter DB 4
 
 
