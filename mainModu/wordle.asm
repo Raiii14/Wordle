@@ -8,13 +8,23 @@ MODE_12        EQU 12H    ; 640x480, 16 colors (VGA)
 BIOS_VIDEO_INT EQU 10H
 DOS_INT        EQU 21H
 
+; External UI procedures
 ; external procedure that draws all boxes
 EXTRN DrawBoxes:NEAR
 ; external procedures for input
 EXTRN GetExactly5:NEAR
 EXTRN SetEchoRow:NEAR
 
+; External game logic procedures (NEW)
+EXTRN CompareWords:NEAR
+EXTRN GetColorResults:NEAR
+EXTRN IsWordCorrect:NEAR
+EXTRN FillBoxRow:NEAR
+
+
+; External game logic procedures
 ; -------------------------------------------------------
+; Todo, not udpated
 ; flow summary (current build)
 ; - switch to graphics mode
 ; - call drawboxes (draws 6 rows of 5 boxes each)
@@ -58,6 +68,21 @@ GAME_LOOP:
     ; get input (bases it on al). al 4 is first row
     CALL SetEchoRow
     CALL GetExactly5
+    
+    ; compare the guess to target
+    CALL CompareWords
+    
+    ; get the color results (return should be like an array)
+    CALL GetColorResults
+    
+    ; fill boxes with colors 
+    MOV AL, currentRow
+    CALL FillBoxRow
+    
+    ; Check if correct
+    CALL IsWordCorrect
+    CMP AL, 1
+    JE WIN_GAME
     
     ; check remaining attempts
     INC currentRow ;increment row by 1
