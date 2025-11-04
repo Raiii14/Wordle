@@ -15,20 +15,42 @@ msg_lose DB 'Out of lives. Game over.',0Dh,0Ah,'$'
 
 ; external input routine (reads exactly 5 letters and returns SI->buffer, CX=length)
 EXTRN GetExactly5:NEAR
+; external word selection routine
+EXTRN GetRandomWord:NEAR
 
 ; expose functions expected by mainModu/wordle.asm
 PUBLIC GameLogic
 PUBLIC CompareWords
 PUBLIC GetColorResults
 PUBLIC IsWordCorrect
+PUBLIC LoadTargetWord
 
 ; ----------------------------
-; GetRandomWord
-; for now, returns a fixed target word in `targetWord`
-GetRandomWord PROC NEAR
-    ; targetWord already initialized in DATA but we keep this proc so caller can refresh or randomize later
+; LoadTargetWord
+; Calls GetRandomWord and copies the result to targetWord
+LoadTargetWord PROC NEAR
+    PUSH AX
+    PUSH CX
+    PUSH SI
+    PUSH DI
+    
+    CALL GetRandomWord      ; SI = pointer to random word
+    LEA DI, targetWord
+    MOV CX, 5
+    
+CopyWord:
+    MOV AL, [SI]
+    MOV [DI], AL
+    INC SI
+    INC DI
+    LOOP CopyWord
+    
+    POP DI
+    POP SI
+    POP CX
+    POP AX
     RET
-GetRandomWord ENDP
+LoadTargetWord ENDP
 
 ; ----------------------------
 ; CompareGuess
@@ -199,8 +221,8 @@ GameLogic PROC NEAR
     ; lives = 6 (use BL)
     MOV BL, 6
 
-    ; pick a word
-    CALL GetRandomWord
+    ; pick a random word and load it into targetWord
+    CALL LoadTargetWord
 
 MainLoop:
     ; call input routine; returns SI->5-chars, CX=5

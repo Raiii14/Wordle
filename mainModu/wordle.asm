@@ -21,6 +21,10 @@ EXTRN GetColorResults:NEAR
 EXTRN IsWordCorrect:NEAR
 EXTRN FillBoxRow:NEAR
 
+; External word service
+EXTRN InitWordList:NEAR
+EXTRN LoadTargetWord:NEAR
+
 
 ; External game logic procedures
 ; -------------------------------------------------------
@@ -41,6 +45,12 @@ main PROC
     ; set data segment
     MOV AX, @DATA
     MOV DS, AX
+
+    ; Initialize word list from CSV file
+    CALL InitWordList
+    
+    ; Load a random target word for this game
+    CALL LoadTargetWord
 
     ; save current text/graphics mode
     MOV AH, 0FH                ; get current video mode
