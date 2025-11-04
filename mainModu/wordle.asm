@@ -39,7 +39,11 @@ EXTRN ShowTargetWord:NEAR
 
 .DATA
     saveMode DB ?         ; to save the original video mode (al from int 10h/ah=0fh)
-    currentRow DB 0 ; tracks which row we are in 
+    currentRow DB 0       ; tracks which row we are in
+    currentRound DB 1     ; current round number (1-based)
+    totalRounds DB 3      ; CHANGE THIS to set number of rounds
+    msg_round DB 'Round $'
+    msg_roundNum DB '0',0Dh,0Ah,'$' 
 
 .CODE
 main PROC
@@ -49,19 +53,23 @@ main PROC
 
     ; Initialize word list from CSV file
     CALL InitWordList
-    
-    ; Load a random target word for this game
-    CALL LoadTargetWord
 
     ; save current text/graphics mode
     MOV AH, 0FH                ; get current video mode
     INT BIOS_VIDEO_INT
     MOV saveMode, AL           ; save mode number from AL
 
+ROUND_START:
+    ; Load a random target word for this round
+    CALL LoadTargetWord
+
     ; switch to graphics mode 12h
     MOV AH, 00H        ; set video mode
     MOV AL, MODE_12
     INT BIOS_VIDEO_INT
+
+    ; display round number at top
+    CALL ShowRoundNumber
 
     ; draw all boxes (separate module)
     CALL DrawBoxes
@@ -104,19 +112,29 @@ GAME_LOOP:
     JL GAME_LOOP ;jump if less than 6 (checks negative flag)
 
 LOSE_GAME:
-    ; Show the target word at the top
+    ; Show the target word at the bottom
     CALL ShowTargetWord
-    ; Wait for keypress before exiting
+    ; Wait for keypress before continuing
     MOV AH, 00H        ; BIOS keyboard - wait for keystroke
     INT 16H            ; Blocks until user presses any key
-    JMP EXIT_GAME
+    JMP CHECK_NEXT_ROUND
 
 WIN_GAME:
-    ; Show the target word at the top
+    ; Show the target word at the bottom
     CALL ShowTargetWord
-    ; Wait for keypress before exiting
+    ; Wait for keypress before continuing
     MOV AH, 00H        ; BIOS keyboard - wait for keystroke
     INT 16H            ; Blocks until user presses any key
+
+CHECK_NEXT_ROUND:
+    ; Check if more rounds remaining
+    MOV AL, currentRound
+    CMP AL, totalRounds
+    JGE EXIT_GAME       ; If currentRound >= totalRounds, exit
+    
+    ; Increment round and start next round
+    INC currentRound
+    JMP ROUND_START
 
 EXIT_GAME:
     ; restore original video mode
@@ -129,4 +147,41 @@ EXIT_GAME:
     INT DOS_INT
 
 main ENDP
+
+; ShowRoundNumber - Displays "Round #" centered at top of screen
+ShowRoundNumber PROC NEAR
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+
+    ; Set cursor to top center (row 1, column 37)
+    MOV AH, 02h
+    MOV BH, 0           ; Page 0
+    MOV DH, 1           ; Row 1
+    MOV DL, 37          ; Column 37 (centered)
+    INT 10h
+
+    ; Print "Round "
+    LEA DX, msg_round
+    MOV AH, 09h
+    INT 21h
+
+    ; Convert round number to ASCII and display
+    MOV AL, currentRound
+    ADD AL, '0'         ; Convert to ASCII digit
+    MOV msg_roundNum, AL
+
+    ; Print the round number
+    LEA DX, msg_roundNum
+    MOV AH, 09h
+    INT 21h
+
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
+ShowRoundNumber ENDP
+
 END main
