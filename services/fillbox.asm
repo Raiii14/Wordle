@@ -196,12 +196,13 @@ RenderTextOnRow PROC NEAR
     PUSH SI
     PUSH DI
 
-    ; Calculate text row: row 4 for first game row, then +3 for each subsequent row
-    ; Text rows: 4, 7, 10, 13, 16, 19
+    ; Calculate text row: same formula as main game loop
+    ; row 0 -> 4, row 1 -> 8, row 2 -> 12, etc.
+    ; Formula: 4 + (row * 4)
     MOV AL, BL              ; AL = row number
-    MOV CL, 3
-    MUL CL                  ; AX = row * 3
-    ADD AL, 4               ; AL = 4 + (row * 3)
+    MOV CL, 4
+    MUL CL                  ; AX = row * 4
+    ADD AL, 4               ; AL = 4 + (row * 4)
     MOV DH, AL              ; DH = text row
 
     ; Get the guess buffer pointer
@@ -227,20 +228,21 @@ RenderLetterLoop:
     ; DH already has row, DL has column
     INT 10h
 
-    ; Draw the letter in bright white
+    ; Draw the letter using write character only (no background)
     ; Use BX as index since [SI+DI] is illegal, but [BX+DI] is legal
     MOV BX, [guessBuffer]   ; BX = base of guess buffer
-    MOV AH, 0Eh             ; Teletype output
-    PUSH BX
-    MOV BH, 0               ; Page 0
-    MOV BL, 0Fh             ; Bright white
-    POP BX
     MOV AL, [BX+DI]         ; Get character from guess buffer (legal addressing)
+    
+    ; Use write character at cursor (AH=0Ah) - only writes character, no background
+    PUSH CX                 ; Save loop counter before INT 10h
+    MOV AH, 0Ah             ; Write character only at current cursor position
     PUSH BX
     MOV BH, 0               ; Page 0
-    MOV BL, 0Fh             ; Bright white
+    MOV BL, 0Fh             ; Bright white foreground
+    MOV CX, 1               ; Write 1 character
     INT 10h
     POP BX
+    POP CX                  ; Restore loop counter
     
     POP DX                  ; Restore DH
     INC DI
