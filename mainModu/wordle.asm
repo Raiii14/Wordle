@@ -48,41 +48,22 @@ main PROC
     MOV BYTE PTR currentRow, 0
 
 GAME_LOOP:
-    ;MOV AL, currentRow
-    ;ADD AL, 4
-    ; 4 8 12 16 20 24 
+    MOV AL, currentRow ;starts at 0
+    MOV BL, 4 ; set 4 to bl since we can't multiply immediately
+    MUL BL ; multiply 4 to the al register
+    
+    ADD AL, 4 ;offset 
+    ; 4 8 12 16 20 24
 
-    ; Row 1 input (text row 4) -
-    MOV AL, 4
+    ; get input (bases it on al). al 4 is first row
     CALL SetEchoRow
     CALL GetExactly5
     
-    ; Row 2 input (text row 8)   
-    MOV AL, 8
-    CALL SetEchoRow
-    CALL GetExactly5
-    
-    ; Row 3 input (text row 12)
-    MOV AL, 12
-    CALL SetEchoRow
-    CALL GetExactly5
-    
-    ; Row 4 input (text row 16) 
-    MOV AL, 16
-    CALL SetEchoRow
-    CALL GetExactly5
-    
-    ; Row 5 input (text row 20) 
-    MOV AL, 20
-    CALL SetEchoRow
-    CALL GetExactly5
-    
-    ; Row 6 input (text row 24) 
-    MOV AL, 24
-    CALL SetEchoRow
-    CALL GetExactly5
-    
-    ; program exit
+    ; check remaining attempts
+    INC currentRow ;increment row by 1
+    CMP currentRow, 6 ;internally subtract currentRow by 6
+    JL GAME_LOOP ;jump if less than 6 (checks negative flag)
+
 LOSE_GAME:
     JMP EXIT_GAME
 
