@@ -23,7 +23,8 @@ EXTRN SetEchoRow:NEAR
 ; -------------------------------------------------------
 
 .DATA
-    saveMode DB ?          ; to save the original video mode (al from int 10h/ah=0fh)
+    saveMode DB ?         ; to save the original video mode (al from int 10h/ah=0fh)
+    currentRow DB 0 ; tracks which row we are in 
 
 .CODE
 main PROC
@@ -43,7 +44,14 @@ main PROC
 
     ; draw all boxes (separate module)
     CALL DrawBoxes
-    
+
+    MOV BYTE PTR currentRow, 0
+
+GAME_LOOP:
+    ;MOV AL, currentRow
+    ;ADD AL, 4
+    ; 4 8 12 16 20 24 
+
     ; Row 1 input (text row 4) -
     MOV AL, 4
     CALL SetEchoRow
@@ -75,7 +83,13 @@ main PROC
     CALL GetExactly5
     
     ; program exit
+LOSE_GAME:
+    JMP EXIT_GAME
 
+WIN_GAME:
+    ; todo
+
+EXIT_GAME:
     ; restore original video mode
     MOV AH, 00H        ; Set Video Mode
     MOV AL, saveMode   ; Load the saved mode
