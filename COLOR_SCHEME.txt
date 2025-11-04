@@ -1,0 +1,21 @@
+WORDLE COLOR SCHEME (VGA Mode 12h - 16 Colors)
+================================================
+
+Color Mappings:
+- GRAY (08h)   : Letter not in word (miss)
+- YELLOW (0Eh) : Letter in word but wrong position (present)
+- GREEN (0Ah)  : Letter in correct position (correct)
+
+Implementation:
+- FillBoxRow procedure in services/fillbox.asm
+- Reads colorResults array from logic.asm via GetColorResults
+- Fills box interiors (skips 1-pixel border)
+- Uses INT 10h AH=0Ch to draw pixels
+
+Box Dimensions (from drawbox.asm):
+- Width: 54 pixels
+- Height: 48 pixels
+- Gap: 10 pixels
+- Start X: 169
+- Start Y: 46
+- Row Gap: 16 pixels

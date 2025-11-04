@@ -21,7 +21,6 @@ PUBLIC GameLogic
 PUBLIC CompareWords
 PUBLIC GetColorResults
 PUBLIC IsWordCorrect
-PUBLIC FillBoxRow
 
 ; ----------------------------
 ; GetRandomWord
@@ -173,13 +172,6 @@ NextOK:
     POP CX
     RET
 IsWordCorrect ENDP
-
-; FillBoxRow: currently textual fallback — print the color line for this row
-; AL = currentRow (0..5) - unused in textual fallback
-FillBoxRow PROC NEAR
-    CALL DisplayColors
-    RET
-FillBoxRow ENDP
 
 ; ----------------------------
 ; ClearColorResults

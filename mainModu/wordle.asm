@@ -68,6 +68,8 @@ GAME_LOOP:
     ; get input (bases it on al). al 4 is first row
     CALL SetEchoRow
     CALL GetExactly5
+    ; SI now points to the guess buffer (returned by GetExactly5)
+    PUSH SI             ; Save guess buffer pointer for FillBoxRow
     
     ; compare the guess to target
     CALL CompareWords
@@ -75,7 +77,8 @@ GAME_LOOP:
     ; get the color results (return should be like an array)
     CALL GetColorResults
     
-    ; fill boxes with colors 
+    ; fill boxes with colors and render text
+    POP SI              ; Restore guess buffer pointer
     MOV AL, currentRow
     CALL FillBoxRow
     
