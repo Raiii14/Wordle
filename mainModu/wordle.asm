@@ -90,10 +90,15 @@ GAME_LOOP:
     JL GAME_LOOP ;jump if less than 6 (checks negative flag)
 
 LOSE_GAME:
+    ; Wait for keypress before exiting
+    MOV AH, 00H        ; BIOS keyboard - wait for keystroke
+    INT 16H            ; Blocks until user presses any key
     JMP EXIT_GAME
 
 WIN_GAME:
-    ; todo
+    ; Wait for keypress before exiting
+    MOV AH, 00H        ; BIOS keyboard - wait for keystroke
+    INT 16H            ; Blocks until user presses any key
 
 EXIT_GAME:
     ; restore original video mode
