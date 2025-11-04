@@ -2,8 +2,11 @@
 TASM mainModu\wordle.asm || GOTO :error
 TASM services\drawbox.asm || GOTO :error
 TASM services\getchar.asm || GOTO :error
+TASM services\compare.asm || GOTO :error
+TASM services\colormap.asm || GOTO :error
+TASM services\fillbox.asm || GOTO :error
 
-TLINK wordle.obj+drawbox.obj+getchar.obj || GOTO :error
+TLINK wordle.obj+drawbox.obj+getchar.obj+compare.obj+colormap.obj+fillbox.obj || GOTO :error
 wordle || GOTO :error
 
 GOTO :end
