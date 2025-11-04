@@ -24,6 +24,7 @@ EXTRN FillBoxRow:NEAR
 ; External word service
 EXTRN InitWordList:NEAR
 EXTRN LoadTargetWord:NEAR
+EXTRN ShowTargetWord:NEAR
 
 
 ; External game logic procedures
@@ -103,12 +104,16 @@ GAME_LOOP:
     JL GAME_LOOP ;jump if less than 6 (checks negative flag)
 
 LOSE_GAME:
+    ; Show the target word at the top
+    CALL ShowTargetWord
     ; Wait for keypress before exiting
     MOV AH, 00H        ; BIOS keyboard - wait for keystroke
     INT 16H            ; Blocks until user presses any key
     JMP EXIT_GAME
 
 WIN_GAME:
+    ; Show the target word at the top
+    CALL ShowTargetWord
     ; Wait for keypress before exiting
     MOV AH, 00H        ; BIOS keyboard - wait for keystroke
     INT 16H            ; Blocks until user presses any key

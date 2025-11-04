@@ -10,6 +10,7 @@ colorResults DB 5 DUP(0)
 ; simple status messages
 msg_win DB 'You win!',0Dh,0Ah,'$'
 msg_lose DB 'Out of lives. Game over.',0Dh,0Ah,'$'
+msg_word DB 'The word was: $'
 
 .CODE
 
@@ -24,6 +25,7 @@ PUBLIC CompareWords
 PUBLIC GetColorResults
 PUBLIC IsWordCorrect
 PUBLIC LoadTargetWord
+PUBLIC ShowTargetWord
 
 ; ----------------------------
 ; LoadTargetWord
@@ -194,6 +196,50 @@ NextOK:
     POP CX
     RET
 IsWordCorrect ENDP
+
+; ----------------------------
+; ShowTargetWord
+; Displays "The word was: XXXXX" centered at the bottom of the screen
+ShowTargetWord PROC NEAR
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    PUSH SI
+
+    ; Center the text at bottom: "The word was: XXXXX" = 20 chars
+    ; Screen width = 80 columns, so center = (80 - 20) / 2 = 30
+    ; Screen height = 30 rows (text mode in graphics mode)
+    MOV AH, 02h
+    MOV BH, 0           ; Page 0
+    MOV DH, 28          ; Row 28 (near bottom)
+    MOV DL, 30          ; Column 30 (centered)
+    INT 10h
+
+    ; Print "The word was: "
+    LEA DX, msg_word
+    MOV AH, 09h
+    INT 21h
+
+    ; Print each letter of the target word
+    LEA SI, targetWord
+    MOV CX, 5
+ShowWordLoop:
+    MOV AH, 0Eh         ; Teletype output
+    MOV BH, 0
+    MOV BL, 0Fh         ; Bright white
+    MOV AL, [SI]
+    INT 10h
+    INC SI
+    LOOP ShowWordLoop
+
+    POP SI
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
+ShowTargetWord ENDP
 
 ; ----------------------------
 ; ClearColorResults
