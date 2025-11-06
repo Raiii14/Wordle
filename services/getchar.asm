@@ -55,6 +55,12 @@ GetExactly5 PROC NEAR
 
         ; ================================================================
 
+        ; Exit early if Escape is pressed
+        CMP AL, 1Bh        ; ESC?
+        JE  OnEscape
+
+        ; ================================================================
+
         ; - if(KeyPressed == Enter && i == 5)
         ; - Which means that there are already 5 characters entered
 
@@ -64,6 +70,13 @@ GetExactly5 PROC NEAR
 
     OnEnter:
         JMP OnEnter_real   ; near jump to real handler (fixes out-of-range)
+
+    ; Handle Escape: signal abort (AL=0, CX=0) and return
+    OnEscape:
+        XOR AX, AX         ; AL=0 (length), AH=0
+        XOR CX, CX         ; CX=0 length
+        LEA SI, input1+2   ; SI still points to buffer start (not used by caller)
+        RET
 
     AfterEnterCheck:
         ; - else if(KeyPressed != Backspace)
@@ -197,20 +210,7 @@ GetExactly5 PROC NEAR
         ; finalize buffer per DOS 0Ah layout for compatibility
         MOV [input1+1], BL       ; actual length
         MOV BYTE PTR [input1+2+5], 0Dh   ; terminating CR
-
-        ; optionally move to next line for readability
-        PUSH AX
-        PUSH BX
-        MOV AH, 0Eh
-        MOV BH, 0
-        MOV BL, 0Fh
-        MOV AL, 0Dh        ; CR
-        INT 10h
-        MOV AL, 0Ah        ; LF
-        INT 10h
-        POP BX
-        POP AX
-
+        
         MOV AL, BL
         XOR AH, AH
         MOV CX, AX             ; cx = 5

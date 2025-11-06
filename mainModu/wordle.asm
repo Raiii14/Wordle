@@ -87,6 +87,9 @@ GAME_LOOP:
     ; get input (bases it on al). al 4 is first row
     CALL SetEchoRow
     CALL GetExactly5
+    ; If ESC was pressed, GetExactly5 returns AL=0 (and CX=0): exit game
+    CMP AL, 0
+    JE EXIT_GAME
     ; SI now points to the guess buffer (returned by GetExactly5)
     PUSH SI             ; Save guess buffer pointer for FillBoxRow
     
