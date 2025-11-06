@@ -19,6 +19,7 @@ COLOR_GREEN  EQU 0Ah    ; Green for correct (2)
 .DATA
 currentColor DB 0       ; Color to fill current box
 guessBuffer DW 0        ; Pointer to current guess buffer
+colorResultsPtr DW 0   ; Pointer to color results for the current row
 
 .CODE
 PUBLIC FillBoxRow
@@ -45,6 +46,7 @@ FillBoxRow PROC NEAR
 
     ; Get color results array pointer
     CALL GetColorResults    ; Returns SI = pointer to colorResults
+    MOV [colorResultsPtr], SI ; Save pointer so text renderer can read colors
 
     ; Calculate Y position for this row: START_Y + row * (BOX_HEIGHT + ROW_GAP)
     MOV AL, BL              ; AL = row number
@@ -193,6 +195,7 @@ RenderTextOnRow PROC NEAR
     PUSH BX
     PUSH CX
     PUSH DX
+    PUSH BP
     PUSH SI
     PUSH DI
 
@@ -205,9 +208,10 @@ RenderTextOnRow PROC NEAR
     ADD AL, 4               ; AL = 4 + (row * 4)
     MOV DH, AL              ; DH = text row
 
-    ; Get the guess buffer pointer
-    MOV SI, [guessBuffer]
-    
+    ; Get the guess buffer pointer and color results pointer
+    MOV BX, [guessBuffer]   ; BX = base of guess buffer for character reads
+    MOV BP, [colorResultsPtr] ; BP = pointer to color results array
+
     ; Column positions for centered text in each box: 24, 32, 40, 48, 56
     ; Draw each of 5 letters
     MOV CX, 5               ; 5 letters
@@ -228,21 +232,40 @@ RenderLetterLoop:
     ; DH already has row, DL has column
     INT 10h
 
-    ; Draw the letter using write character only (no background)
-    ; Use BX as index since [SI+DI] is illegal, but [BX+DI] is legal
-    MOV BX, [guessBuffer]   ; BX = base of guess buffer
-    MOV AL, [BX+DI]         ; Get character from guess buffer (legal addressing)
-    
-    ; Use write character at cursor (AH=0Ah) - only writes character, no background
-    PUSH CX                 ; Save loop counter before INT 10h
-    MOV AH, 0Ah             ; Write character only at current cursor position
-    PUSH BX
-    MOV BH, 0               ; Page 0
-    MOV BL, 0Fh             ; Bright white foreground
-    MOV CX, 1               ; Write 1 character
+    ; Draw the letter using teletype output (AH=0Eh). Keep AL as the
+    ; character and set BL to attribute (background<<4 | foreground).
+    MOV AL, [BX+DI]         ; AL = character from guess buffer
+
+    ; Determine background color for this letter from color results (BP base)
+    MOV AH, [BP+DI]         ; AH = color code (0,1,2)
+    CMP AH, 2
+    JE Render_SetGreen2
+    CMP AH, 1
+    JE Render_SetYellow2
+    ; Default to gray
+    MOV AH, COLOR_GRAY
+    JMP Render_ColorReady2
+Render_SetYellow2:
+    MOV AH, COLOR_YELLOW
+    JMP Render_ColorReady2
+Render_SetGreen2:
+    MOV AH, COLOR_GREEN
+Render_ColorReady2:
+    ; AH now contains background color nibble. Build attribute in AL while
+    ; preserving the character in AX via the stack, then set BL and call INT 10h.
+    PUSH CX                 ; save loop counter
+    PUSH BX                 ; save BX (we'll overwrite BL temporarily)
+    PUSH AX                 ; save AX (character in AL)
+    MOV AL, AH              ; AL = background nibble
+    SHL AL, 4               ; AL = background << 4
+    OR AL, 0Fh              ; AL = attribute (bg<<4 | bright white)
+    MOV BL, AL              ; BL = attribute
+    POP AX                  ; restore AX so AL = original character
+    MOV AH, 0Eh             ; teletype output (AL = char, BL = attribute)
+    MOV BH, 0               ; page 0
     INT 10h
-    POP BX
-    POP CX                  ; Restore loop counter
+    POP BX                  ; restore BX
+    POP CX                  ; restore loop counter
     
     POP DX                  ; Restore DH
     INC DI
@@ -250,6 +273,7 @@ RenderLetterLoop:
 
     POP DI
     POP SI
+    POP BP
     POP DX
     POP CX
     POP BX
