@@ -120,6 +120,9 @@ LOSE_GAME:
     ; Wait for keypress before continuing
     MOV AH, 00H        ; BIOS keyboard - wait for keystroke
     INT 16H            ; Blocks until user presses any key
+    ; If ESC was pressed here, exit game instead of proceeding
+    CMP AL, 1Bh
+    JE  EXIT_GAME
     JMP CHECK_NEXT_ROUND
 
 WIN_GAME:
@@ -128,6 +131,9 @@ WIN_GAME:
     ; Wait for keypress before continuing
     MOV AH, 00H        ; BIOS keyboard - wait for keystroke
     INT 16H            ; Blocks until user presses any key
+    ; If ESC was pressed here, exit game instead of proceeding
+    CMP AL, 1Bh
+    JE  EXIT_GAME
 
 CHECK_NEXT_ROUND:
     ; Check if more rounds remaining
