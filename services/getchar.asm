@@ -1,6 +1,8 @@
 
 .MODEL SMALL
 
+EXTRN IsValidWord:NEAR
+
 .DATA
 
 ; buffered input for up to 5 characters + carriage return
@@ -22,7 +24,9 @@ RowCenter DB 4
 ; - loop:
 ;   - read a key (INT 16h)
 ;   - if Enter:
-;       - if bl == 5 → finalize buffer (DOS 0Ah layout), print CR/LF, return
+;       - if bl == 5 
+;           if is valid -> accept finalize buffer (DOS 0Ah layout), print CR/LF, return
+;           else ->show error, stay in row
 ;       - else → keep waiting for more input
 ;   - else if Backspace and bl > 0:
 ;       - decrement bl and si; move cursor to row 4 and center column for that index
@@ -199,6 +203,7 @@ GetExactly5 PROC NEAR
     POP BX
     POP AX
         JMP ReadLoop
+    
 
     OnEnter_real:
         CMP BL, 5
@@ -206,6 +211,11 @@ GetExactly5 PROC NEAR
         JMP ReadLoop       ; not enough characters, keep buffer and go back to the starting loop
 
     HaveFiveChars:
+        ; validate word before accepting
+        LEA SI, input1+2
+        CALL IsValidWord
+        CMP AL, 0;
+        JE InvalidWord ; jump if word is not in the pool of words
 
         ; finalize buffer per DOS 0Ah layout for compatibility
         MOV [input1+1], BL       ; actual length
@@ -216,6 +226,10 @@ GetExactly5 PROC NEAR
         MOV CX, AX             ; cx = 5
         LEA SI, input1+2         ; si -> first character
         RET
+        
+    InvalidWord:
+        ;todo
+        JMP ReadLoop
 GetExactly5 ENDP
 
 ; -------------------------------------------------------
