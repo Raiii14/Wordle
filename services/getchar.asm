@@ -1,4 +1,3 @@
-
 .MODEL SMALL
 
 EXTRN IsValidWord:NEAR
@@ -9,7 +8,7 @@ EXTRN IsValidWord:NEAR
 input1 DB 05, ?, 06 DUP(?)
 
 ; error message shown when user enters a word not in the list
-errInvalid DB 'Not in word list',0Dh,0Ah,'$'
+errInvalid DB 'Not in word list - Try again!$'
 
 ; center column per box (text grid cols), for 5 boxes left -> right
 ; computed from START_X=169, BOX_WIDTH=54, BOX_GAP=10
@@ -17,6 +16,9 @@ errInvalid DB 'Not in word list',0Dh,0Ah,'$'
 colTable DB 24, 32, 40, 48, 56
 ; active text-row to echo into (top of 8x16 cell). 4 = first row center, 8 = second row center, etc.
 RowCenter DB 4
+
+; flag to track if error message is displayed
+errorDisplayed DB 0
 
 
 .CODE
@@ -59,6 +61,13 @@ GetExactly5 PROC NEAR
         ; wait for a keystroke (blocking)
         MOV AH, 00h         ; ah=00h read key
         INT 16h            ; al=ascii (if any), ah=scancode
+
+        ; Clear error message if displayed and user starts typing
+        CMP BYTE PTR [errorDisplayed], 1
+        JNE SkipErrorClear
+        CALL ClearInvalidWordError
+        MOV BYTE PTR [errorDisplayed], 0
+SkipErrorClear:
 
         ; ================================================================
 
@@ -231,6 +240,10 @@ GetExactly5 PROC NEAR
         RET
         
     InvalidWord:
+        ; Show error message (stays until user types again)
+        CALL ShowInvalidWordError
+        MOV BYTE PTR [errorDisplayed], 1
+        
         ; Invalid word: clear the input buffer and visually erase typed letters
         ; BL = current length, SI points after last char (input1+2 + BL)
         ; We'll iterate and erase each displayed char then reset BL and SI
@@ -294,5 +307,88 @@ SetEchoRow PROC NEAR
     MOV [RowCenter], AL
     RET
 SetEchoRow ENDP
+
+; -------------------------------------------------------
+; ShowInvalidWordError
+; Displays "Not in word list - Try again!" below the 6 rows of boxes
+; (row 27, above where "The word was:" appears at row 28)
+; Message stays visible until user starts typing again
+; -------------------------------------------------------
+ShowInvalidWordError PROC NEAR
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    PUSH SI
+
+    ; Set cursor position (row 27, column 28 for centering)
+    ; This is just above "The word was:" which appears at row 28
+    MOV AH, 02h
+    MOV BH, 0           ; Page 0
+    MOV DH, 27          ; Row 27 (below all boxes, above "The word was:")
+    MOV DL, 26          ; Column 28 (centered)
+    INT 10h
+
+    ; Display error message in red (color 0Ch)
+    LEA SI, errInvalid
+ShowErrLoop:
+    MOV AL, [SI]
+    CMP AL, '$'
+    JE ErrDisplayed
+    
+    MOV AH, 0Eh         ; Teletype output
+    MOV BH, 0           ; Page 0
+    PUSH BX
+    MOV BL, 0Ch         ; Red text
+    INT 10h
+    POP BX
+    
+    INC SI
+    JMP ShowErrLoop
+
+ErrDisplayed:
+    POP SI
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
+ShowInvalidWordError ENDP
+
+; -------------------------------------------------------
+; ClearInvalidWordError
+; Clears the error message by overwriting with spaces
+; -------------------------------------------------------
+ClearInvalidWordError PROC NEAR
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+
+    ; Set cursor to same position as error message
+    MOV AH, 02h
+    MOV BH, 0
+    MOV DH, 27          ; Row 27
+    MOV DL, 26          ; Column 28
+    INT 10h
+
+    ; Clear the error message by overwriting with spaces
+    MOV CX, 29          ; Length of error message
+ClrErrLoop:
+    MOV AH, 0Eh
+    MOV BH, 0
+    PUSH BX
+    XOR BL, BL          ; Black color
+    MOV AL, ' '
+    INT 10h
+    POP BX
+    LOOP ClrErrLoop
+
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
+ClearInvalidWordError ENDP
 
 END
