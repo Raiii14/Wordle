@@ -1,0 +1,196 @@
+
+.MODEL SMALL
+
+.STACK 64
+
+; Constants for Video Modes
+MODE_12        EQU 12H    ; 640x480, 16 colors (VGA)
+BIOS_VIDEO_INT EQU 10H
+DOS_INT        EQU 21H
+
+; External UI procedures
+; external procedure that draws all boxes
+EXTRN DrawBoxes:NEAR
+; external procedures for input
+EXTRN GetExactly5:NEAR
+EXTRN SetEchoRow:NEAR
+
+; External game logic procedures (NEW)
+EXTRN CompareWords:NEAR
+EXTRN GetColorResults:NEAR
+EXTRN IsWordCorrect:NEAR
+EXTRN FillBoxRow:NEAR
+
+; External word service
+EXTRN InitWordList:NEAR
+EXTRN LoadTargetWord:NEAR
+EXTRN ShowTargetWord:NEAR
+
+
+; External game logic procedures
+; -------------------------------------------------------
+; Todo, not udpated
+; flow summary (current build)
+; - switch to graphics mode
+; - call drawboxes (draws 6 rows of 5 boxes each)
+; - collect input for each row sequentially (rows 1-6)
+; - restore mode, exit
+; -------------------------------------------------------
+
+.DATA
+    saveMode DB ?         ; to save the original video mode (al from int 10h/ah=0fh)
+    currentRow DB 0       ; tracks which row we are in
+    currentRound DB 1     ; current round number (1-based)
+    totalRounds DB 3      ; CHANGE THIS to set number of rounds
+    msg_round DB 'Round $'
+    msg_roundNum DB '0',0Dh,0Ah,'$' 
+
+.CODE
+main PROC
+    ; set data segment
+    MOV AX, @DATA
+    MOV DS, AX
+
+    ; Initialize word list from CSV file
+    CALL InitWordList
+
+    ; save current text/graphics mode
+    MOV AH, 0FH                ; get current video mode
+    INT BIOS_VIDEO_INT
+    MOV saveMode, AL           ; save mode number from AL
+
+ROUND_START:
+    ; Load a random target word for this round
+    CALL LoadTargetWord
+
+    ; switch to graphics mode 12h
+    MOV AH, 00H        ; set video mode
+    MOV AL, MODE_12
+    INT BIOS_VIDEO_INT
+
+    ; display round number at top
+    CALL ShowRoundNumber
+
+    ; draw all boxes (separate module)
+    CALL DrawBoxes
+
+    MOV BYTE PTR currentRow, 0
+
+GAME_LOOP:
+    MOV AL, currentRow ;starts at 0
+    MOV BL, 4 ; set 4 to bl since we can't multiply immediately
+    MUL BL ; multiply 4 to the al register
+    
+    ADD AL, 4 ;offset 
+    ; 4 8 12 16 20 24
+
+    ; get input (bases it on al). al 4 is first row
+    CALL SetEchoRow
+    CALL GetExactly5
+    ; If ESC was pressed, GetExactly5 returns AL=0 (and CX=0): exit game
+    CMP AL, 0
+    JE EXIT_GAME
+    ; SI now points to the guess buffer (returned by GetExactly5)
+    PUSH SI             ; Save guess buffer pointer for FillBoxRow
+    
+    ; compare the guess to target
+    CALL CompareWords
+    
+    ; get the color results (return should be like an array)
+    CALL GetColorResults
+    
+    ; fill boxes with colors and render text
+    POP SI              ; Restore guess buffer pointer
+    MOV AL, currentRow
+    CALL FillBoxRow
+    
+    ; Check if correct
+    CALL IsWordCorrect
+    CMP AL, 1
+    JE WIN_GAME
+    
+    ; check remaining attempts
+    INC currentRow ;increment row by 1
+    CMP currentRow, 6 ;internally subtract currentRow by 6
+    JL GAME_LOOP ;jump if less than 6 (checks negative flag)
+
+LOSE_GAME:
+    ; Show the target word at the bottom
+    CALL ShowTargetWord
+    ; Wait for keypress before continuing
+    MOV AH, 00H        ; BIOS keyboard - wait for keystroke
+    INT 16H            ; Blocks until user presses any key
+    ; If ESC was pressed here, exit game instead of proceeding
+    CMP AL, 1Bh
+    JE  EXIT_GAME
+    JMP CHECK_NEXT_ROUND
+
+WIN_GAME:
+    ; Show the target word at the bottom
+    CALL ShowTargetWord
+    ; Wait for keypress before continuing
+    MOV AH, 00H        ; BIOS keyboard - wait for keystroke
+    INT 16H            ; Blocks until user presses any key
+    ; If ESC was pressed here, exit game instead of proceeding
+    CMP AL, 1Bh
+    JE  EXIT_GAME
+
+CHECK_NEXT_ROUND:
+    ; Check if more rounds remaining
+    MOV AL, currentRound
+    CMP AL, totalRounds
+    JGE EXIT_GAME       ; If currentRound >= totalRounds, exit
+    
+    ; Increment round and start next round
+    INC currentRound
+    JMP ROUND_START
+
+EXIT_GAME:
+    ; restore original video mode
+    MOV AH, 00H        ; Set Video Mode
+    MOV AL, saveMode   ; Load the saved mode
+    INT BIOS_VIDEO_INT
+
+    ; exit program 
+    MOV AX, 4C00H
+    INT DOS_INT
+
+main ENDP
+
+; ShowRoundNumber - Displays "Round #" centered at top of screen
+ShowRoundNumber PROC NEAR
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+
+    ; Set cursor to top center (row 1, column 37)
+    MOV AH, 02h
+    MOV BH, 0           ; Page 0
+    MOV DH, 1           ; Row 1
+    MOV DL, 37          ; Column 37 (centered)
+    INT 10h
+
+    ; Print "Round "
+    LEA DX, msg_round
+    MOV AH, 09h
+    INT 21h
+
+    ; Convert round number to ASCII and display
+    MOV AL, currentRound
+    ADD AL, '0'         ; Convert to ASCII digit
+    MOV msg_roundNum, AL
+
+    ; Print the round number
+    LEA DX, msg_roundNum
+    MOV AH, 09h
+    INT 21h
+
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
+ShowRoundNumber ENDP
+
+END main

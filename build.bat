@@ -1,9 +1,7 @@
 @ECHO OFF
 TASM mainModu\wordle.asm
-TASM services\services.asm
 
-
-TLINK wordle.obj+services.obj
+TLINK wordle.obj
 wordle
 
 ECHO Done.
