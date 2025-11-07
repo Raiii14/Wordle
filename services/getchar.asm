@@ -1,4 +1,3 @@
-
 .MODEL SMALL
 
 EXTRN IsValidWord:NEAR
@@ -167,57 +166,61 @@ GetExactly5 PROC NEAR
             INC SI
             INC BL
         
-    ; echo the character centered in its box using the table
-    ; so we save and restore registers to the stack, to avoid overwriting values
-    PUSH AX
-    PUSH BX
-    PUSH CX
-    PUSH DX
-    PUSH SI
-    PUSH DI
-    ; =====================================================
-    ; idx = BL-1 (0..4)
-    MOV CL, BL
-    DEC CL
-    MOV DI, OFFSET colTable
-    XOR CH, CH
-    ADD DI, CX
-    MOV DL, [DI]       ; DL = center col for this box
-    MOV DH, [RowCenter]     ; active center row
-    MOV AH, 02h        ; set cursor
-    MOV BH, 0
-    INT 10h
-    ; draw the character in bright white
-    MOV AH, 0Eh
-    MOV BH, 0
-    PUSH BX            ; preserve BL=len
-    MOV BL, 0Fh
-    MOV AL, [SI-1]
-    INT 10h
-    ; =====================================================
-    POP BX
-    POP DI
-    POP SI
-    POP DX
-    POP CX
-    POP BX
-    POP AX
+        ; echo the character centered in its box using the table
+        ; so we save and restore registers to the stack, to avoid overwriting values
+        PUSH AX
+        PUSH BX
+        PUSH CX
+        PUSH DX
+        PUSH SI
+        PUSH DI
+        ; =====================================================
+        ; idx = BL-1 (0..4)
+        MOV CL, BL
+        DEC CL
+        MOV DI, OFFSET colTable
+        XOR CH, CH
+        ADD DI, CX
+        MOV DL, [DI]       ; DL = center col for this box
+        MOV DH, [RowCenter]     ; active center row
+        MOV AH, 02h        ; set cursor
+        MOV BH, 0
+        INT 10h
+        ; draw the character in bright white
+        MOV AH, 0Eh
+        MOV BH, 0
+        PUSH BX            ; preserve BL=len
+        MOV BL, 0Fh
+        MOV AL, [SI-1]
+        INT 10h
+        ; =====================================================
+        POP BX
+        POP DI
+        POP SI
+        POP DX
+        POP CX
+        POP BX
+        POP AX
         JMP ReadLoop
     
 
     OnEnter_real:
         CMP BL, 5
-        JE  HaveFiveChars       ; 
-        JMP ReadLoop       ; not enough characters, keep buffer and go back to the starting loop
+        JE  HaveFiveChars       
+        JMP ReadLoop       ; not enough characters, keep waiting
 
     HaveFiveChars:
+        ; REMOVE THE TEST LINE - validate properly now
         ; validate word before accepting
-        LEA SI, input1+2
+        PUSH SI
+        LEA SI, input1+2        ; ensure SI points to start of buffer
         CALL IsValidWord
-        CMP AL, 0;
+        POP SI                  ; restore SI after validation
+        
+        CMP AL, 0
         JE InvalidWord ; jump if word is not in the pool of words
 
-        ; finalize buffer per DOS 0Ah layout for compatibility
+        ; Valid word - finalize buffer and return
         MOV [input1+1], BL       ; actual length
         MOV BYTE PTR [input1+2+5], 0Dh   ; terminating CR
         
@@ -228,8 +231,81 @@ GetExactly5 PROC NEAR
         RET
         
     InvalidWord:
-        ;todo
-        JMP ReadLoop
+        ; Flash by drawing a red rectangle briefly
+        PUSH AX
+        PUSH BX
+        PUSH CX
+        PUSH DX
+        
+        ; Draw a red rectangle at top of screen as flash indicator
+        MOV AH, 0Ch             ; Write pixel
+        MOV AL, 04h             ; Red color
+        MOV BH, 0               ; Page 0
+        
+        ; Draw a thick red line at top (rows 0-10, full width)
+        MOV DX, 0               ; Start at row 0
+    FlashRowLoop:
+        CMP DX, 10              ; Draw 10 rows
+        JAE FlashDone
+        MOV CX, 0               ; Start at column 0
+    FlashColLoop:
+        CMP CX, 640             ; Full width
+        JAE FlashRowNext
+        INT 10h                 ; Draw pixel
+        INC CX
+        JMP FlashColLoop
+    FlashRowNext:
+        INC DX
+        JMP FlashRowLoop
+    FlashDone:
+        
+        ; Delay
+        PUSH CX
+        MOV CX, 0FFFFh
+    FlashDelay1:
+        LOOP FlashDelay1
+        POP CX
+        
+        ; Erase the red line (draw black)
+        MOV AL, 00h             ; Black color
+        MOV DX, 0
+    EraseRowLoop:
+        CMP DX, 10
+        JAE EraseDone
+        MOV CX, 0
+    EraseColLoop:
+        CMP CX, 640
+        JAE EraseRowNext
+        INT 10h
+        INC CX
+        JMP EraseColLoop
+    EraseRowNext:
+        INC DX
+        JMP EraseRowLoop
+    EraseDone:
+        
+        POP DX
+        POP CX
+        POP BX
+        POP AX
+        
+        ; Clear the buffer (don't try to erase visually - just let them type over it)
+        PUSH SI
+        PUSH CX
+        LEA SI, input1+2
+        MOV CX, 5
+    ClearBuffer:
+        MOV BYTE PTR [SI], 0
+        INC SI
+        LOOP ClearBuffer
+        POP CX
+        POP SI
+        
+        ; Reset SI and BL to allow retyping
+        LEA SI, input1+2        ; reset buffer pointer to start
+        MOV BL, 0               ; reset length counter to 0
+
+        JMP ReadLoop            ; go back to accepting input
 GetExactly5 ENDP
 
 ; -------------------------------------------------------
