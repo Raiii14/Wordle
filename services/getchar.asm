@@ -228,7 +228,55 @@ GetExactly5 PROC NEAR
         RET
         
     InvalidWord:
-        ;todo
+        ; Invalid word: clear the input buffer and visually erase typed letters
+        ; BL = current length, SI points after last char (input1+2 + BL)
+        ; We'll iterate and erase each displayed char then reset BL and SI
+        PUSH AX
+        PUSH BX
+        PUSH CX
+        PUSH DX
+        PUSH SI
+        PUSH DI
+
+    ClearLoop:
+        CMP BL, 0
+        JE ClearDone
+        ; Move SI back to last character and decrement length
+        DEC SI
+        DEC BL
+
+        ; move cursor to row=RowCenter, col from table by index BL
+        MOV AH, 02h         ; set cursor
+        MOV BH, 0           ; page 0
+        MOV DH, [RowCenter] ; center row
+        MOV DI, OFFSET colTable
+        XOR CH, CH
+        MOV CL, BL          ; index = BL (0..4)
+        ADD DI, CX
+        MOV DL, [DI]        ; DL = col
+        INT 10h
+
+        ; print a space in black to overwrite the character
+        MOV AH, 0Eh         ; teletype output
+        MOV BH, 0
+        PUSH BX             ; save BL
+        XOR BL, BL          ; BL=0 (black)
+        MOV AL, ' '
+        INT 10h
+        POP BX
+
+        JMP ClearLoop
+
+    ClearDone:
+        POP DI
+        POP SI
+        POP DX
+        POP CX
+        POP BX
+        POP AX
+        ; reset buffer pointer and length so user can type a fresh guess
+        LEA SI, input1+2
+        XOR BL, BL
         JMP ReadLoop
 GetExactly5 ENDP
 
