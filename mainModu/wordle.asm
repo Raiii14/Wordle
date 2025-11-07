@@ -394,24 +394,21 @@ DrawBoxes ENDP
 ; ============================================================================
 
 ; -------------------------------------------------------
-; flow summary (current build)
-; - si points to the input buffer; bl holds current length (0..5)
-; - loop:
-;   - read a key (INT 16h)
-;   - if Enter:
-;       - if bl == 5 
-;           if is valid -> accept finalize buffer (DOS 0Ah layout), print CR/LF, return
-;           else ->show error, stay in row
-;       - else → keep waiting for more input
-;   - else if Backspace and bl > 0:
-;       - decrement bl and si; move cursor to row 4 and center column for that index
-;       - print the removed character in black to visually erase it
-;   - else if key is a letter:
-;       - convert lowercase to uppercase; if bl < 5 store it (buffer[si] = AL)
-;       - increment bl; move cursor to row 4 and center column for (bl-1)
-;       - print the character in bright white
-;   - else:
-;       - ignore the key and read again
+; flow summary (current build, combined file)
+; - Reads keys with INT 16h; Esc exits early by returning AL=0, CX=0 (main checks and quits).
+; - Accepts letters only; converts to uppercase; stores up to 5 chars in input1 (SI walks buffer, BL = length).
+
+; - Echoes each letter centered in the active row (RowCenter set via SetEchoRow):
+;     - INT 10h AH=02h positions the cursor at colTable[0..4], DH=RowCenter.
+;     - INT 10h AH=0Eh prints only the glyph in bright white (BL=0Fh); no background is painted.
+; - Backspace erases the last char: moves left, reprints that position in black to visually clear it.
+
+; - Enter when BL==5 triggers validation (IsValidWord):
+;     - If valid: finalize DOS 0Ah layout (store length and CR), return SI->input1+2, CX=5, AL=5.
+;     - If invalid: show "Not in word list - Try again!" on row 27 in red, clear the typed letters, and continue.
+; - If the error message is displayed, the next keypress clears it first (ClearInvalidWordError) before echoing.
+
+; - Returns: success -> SI=input1+2, CX=5, AL=5; Esc -> AL=0, CX=0 (caller exits).
 ; -------------------------------------------------------
 
 ; blocks until exactly 5 characters are entered; retains what was typed if enter is pressed early
