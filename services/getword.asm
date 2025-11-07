@@ -25,6 +25,8 @@ errReadFile DB 'Error: Cannot read file',0Dh,0Ah,'$'
 .CODE
 PUBLIC GetRandomWord
 PUBLIC InitWordList
+PUBLIC wordList
+PUBLIC wordCount
 
 ; InitWordList - Load words from CSV file
 InitWordList PROC NEAR

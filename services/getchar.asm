@@ -8,6 +8,9 @@ EXTRN IsValidWord:NEAR
 ; buffered input for up to 5 characters + carriage return
 input1 DB 05, ?, 06 DUP(?)
 
+; error message shown when user enters a word not in the list
+errInvalid DB 'Not in word list',0Dh,0Ah,'$'
+
 ; center column per box (text grid cols), for 5 boxes left -> right
 ; computed from START_X=169, BOX_WIDTH=54, BOX_GAP=10
 ; result: 24, 32, 40, 48, 56 (increments by 8)
@@ -228,7 +231,12 @@ GetExactly5 PROC NEAR
         RET
         
     InvalidWord:
-        ;todo
+        ; Show a short error message and continue accepting input
+        PUSH AX
+        LEA DX, errInvalid
+        MOV AH, 09h
+        INT 21h
+        POP AX
         JMP ReadLoop
 GetExactly5 ENDP
 
