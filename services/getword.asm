@@ -11,6 +11,8 @@ fileBuffer DB 512 DUP(0)
 bufferSize DW 512
 
 ; Word list storage (max 50 words)
+PUBLIC wordList
+PUBLIC wordCount
 wordList DB 250 DUP(0)      ; 50 words * 5 chars each
 wordCount DW 0
 

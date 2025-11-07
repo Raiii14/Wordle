@@ -1,25 +1,20 @@
-; validation service ( check if the input word is in the pool of words)
+; validation service (check if the input word is in the pool of words)
 
 .MODEL SMALL 
 
 .DATA
-
-.CODE
-PUBLIC IsValidWord
-;  Check if the 5-letter word (pointed by SI) exists in the loaded word list
-;  Inputs:
-;    SI -> pointer to 5-character buffer (not necessarily zero-terminated)
-;  Returns:
-;    AL = 1 if word exists in wordList, 0 otherwise
-
-; External symbols from getword.asm
-; wordList is a byte array, wordCount is a word (DW)
+; External word list access
 EXTRN wordList:BYTE
 EXTRN wordCount:WORD
 
-IsValidWord PROC NEAR
-    ; preserve registers used
-    PUSH AX
+.CODE
+PUBLIC IsValidWord
+
+; IsValidWord
+; Check if the 5 letter word exists in the word pool
+; Input: SI = pointer to 5 char word buffer
+; Output: AL = 1 if valid, 0 if invalid
+IsValidWord PROC NEAR 
     PUSH BX
     PUSH CX
     PUSH DX
@@ -27,55 +22,75 @@ IsValidWord PROC NEAR
     PUSH DI
     PUSH BP
 
-    ; save guess pointer
-    MOV BP, SI        ; BP = pointer to guessed word (5 bytes)
-
-    ; get number of words
+    ; Get word count
     MOV CX, wordCount
     CMP CX, 0
-    JE NotFound       ; no words loaded -> not found
+    JE NotFound         ; No words loaded
 
-    LEA SI, wordList  ; SI points to first word in list
-    ; Use BX as pointer to current word base and SI as guess base
-    LEA BX, wordList  ; BX = base of word list
+    ; Point DI to start of word list
+    LEA DI, wordList
+    MOV BP, SI          ; Save input pointer in BP
 
-OuterLoop:
-    ; SI will be used as guess base pointer (BP holds guess pointer)
-    MOV SI, BP        ; SI = guess pointer
-    ; DI = pointer to current word start (copy BX)
-    MOV DI, BX
-    ; DX = letter counter = 5
-    MOV DX, 5
+CheckNextWord:
+    ; Compare 5 characters
+    MOV SI, BP          ; Reset input pointer
+    MOV BX, 5           ; 5 characters to compare
 
 CompareLoop:
-    MOV AL, [DI]
-    MOV AH, [SI]
+    MOV AL, [SI]        ; Get input char
+    MOV AH, [DI]        ; Get word list char
+    
+    ; Convert both to uppercase for comparison
+    CMP AL, 'a'
+    JB InputUpper
+    CMP AL, 'z'
+    JA InputUpper
+    SUB AL, 32
+InputUpper:
+    CMP AH, 'a'
+    JB ListUpper
+    CMP AH, 'z'
+    JA ListUpper
+    SUB AH, 32
+ListUpper:
+    
     CMP AL, AH
-    JNE NextWord
-    INC DI
+    JNE NoMatch
+    
     INC SI
-    DEC DX
+    INC DI
+    DEC BX
     JNZ CompareLoop
-    ; matched all 5 letters
-    MOV AL, 1
-    JMP ReturnClean
+    
+    ; All 5 characters matched!
+    JMP Found
 
-NextWord:
-    ADD BX, 5         ; advance BX to next word start
-    LOOP OuterLoop    ; CX--, repeat until CX==0
+NoMatch:
+    ; Move DI to next word (skip remaining chars of current word)
+    SUB BX, 5           ; BX is negative or 0
+    NEG BX              ; BX = chars already compared
+    MOV AX, 5
+    SUB AX, BX          ; AX = chars remaining
+    ADD DI, AX          ; Skip to next word
+    
+    LOOP CheckNextWord  ; Check next word
 
 NotFound:
-    XOR AL, AL        ; AL = 0
+    ; Word not found - return 0 (invalid)
+    ; Error message will be shown in getchar.asm
+    MOV AL, 0           ; Return 0 (invalid)
+    JMP ValidateExit
 
-ReturnClean:
-    ; restore registers in reverse order
+Found:
+    MOV AL, 1           ; Return 1 (valid)
+
+ValidateExit:
     POP BP
     POP DI
     POP SI
     POP DX
     POP CX
     POP BX
-    POP AX
     RET
 IsValidWord ENDP
 
