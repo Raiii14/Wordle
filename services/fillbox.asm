@@ -134,46 +134,57 @@ FillSingleBox PROC NEAR
     PUSH DX
     PUSH DI
     PUSH BP
+    ; Calculate interior boundaries (skip 1-pixel border on each side)
+    ; AX = left X, DX = top Y (as passed in)
+    ; We'll compute:
+    ;   CX = startX = AX + 1
+    ;   DI = endX  = AX + BOX_WIDTH - 1  (loop uses CX < DI)
+    ;   BP = endY  = topY + BOX_HEIGHT - 1 (loop uses DX < BP)
 
-    ; Calculate boundaries (interior, skip 1-pixel border)
-    MOV CX, AX              ; CX = start X
-    INC CX                  ; Skip left border
+    ; start X (interior)
+    MOV CX, AX
+    INC CX                  ; CX = AX + 1
+
+    ; end X (exclusive bound)
     MOV DI, AX
-    ADD DI, BOX_WIDTH
-    DEC DI                  ; DI = end X (skip right border)
-    
-    MOV DX, DX              ; DX already has top Y
-    INC DX                  ; Skip top border
+    ADD DI, BOX_WIDTH       ; DI = AX + BOX_WIDTH (exclusive bound so we draw while X < DI)
+
+    ; start Y (interior)
+    MOV BP, DX
+    INC BP                  ; BP will temporarily hold startY (BP = topY + 1)
+    MOV DX, BP              ; DX = startY
+
+    ; end Y (exclusive bound)
     MOV BP, DX
     ADD BP, BOX_HEIGHT
-    DEC BP                  ; BP = end Y (skip bottom border)
+    DEC BP                  ; BP = startY + BOX_HEIGHT - 1 -> effectively topY + BOX_HEIGHT - 1
 
-    ; Setup for pixel drawing
-    MOV AH, 0Ch             ; Write pixel
+    ; Setup for pixel drawing (INT 10h AH=0Ch)
+    MOV AH, 0Ch             ; Write pixel function
     MOV AL, [currentColor]  ; Color
     MOV BH, 0               ; Page 0
 
-    ; Fill row by row
-    MOV DX, DX              ; Start from top + 1
-    INC DX
 FillRowLoop:
     CMP DX, BP
     JAE FillDone
-    
-    PUSH CX                 ; Save start X
+
+    PUSH CX                 ; save start X
+    MOV SI, CX              ; use SI as running X
+
 FillColLoop:
-    CMP CX, DI
+    CMP SI, DI
     JAE FillRowDone
-    
-    ; Draw pixel at (CX, DX)
+
+    ; Draw pixel at (SI, DX)
+    MOV CX, SI              ; set CX = X for INT 10h (CX used as column by BIOS)
     INT 10h
-    
-    INC CX
+
+    INC SI
     JMP FillColLoop
 
 FillRowDone:
-    POP CX                  ; Restore start X
-    INC DX
+    POP CX                  ; restore CX (start X)
+    INC DX                  ; next scanline
     JMP FillRowLoop
 
 FillDone:
